@@ -1,0 +1,15 @@
+# Avhengigheter og lokale Cloudflare-filer
+node_modules/
+.wrangler/
+
+# Hemmeligheter (API-nøkler for Resend og Claude)
+.dev.vars
+.env
+
+# Ekte økonomidata skal aldri inn i repoet
+*.csv
+*.xlsx
+kvitteringer/
+eksport/
+
+.DS_Store

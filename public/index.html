@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1A2B">
+<title>Husholdningsverket</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<header class="top" id="top" hidden>
+  <div class="brand">
+    <div class="mark" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9H4z"/><path d="M9 17v-3M12 17v-5M15 17v-2"/></svg></div>
+    <div class="word">Husholdnings<b>verket</b></div>
+  </div>
+  <div class="toolbar">
+    <span id="hhSlot"></span>
+    <div class="month">
+      <button class="iconbtn" data-action="prevMonth" aria-label="Forrige måned"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+      <span id="monthLabel"></span>
+      <button class="iconbtn" data-action="nextMonth" aria-label="Neste måned"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+    </div>
+    <input type="file" id="receiptInput" class="sr" accept="image/*" capture="environment" data-change="receipt">
+    <label for="receiptInput" class="btn primary" style="cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Kvittering</label>
+    <button class="btn dark" data-action="go" data-view="import"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Importer</button>
+  </div>
+</header>
+
+<div class="layout" id="layout" hidden>
+  <nav class="side" aria-label="Hovedmeny" id="nav"></nav>
+  <main id="main"></main>
+</div>
+<div id="auth"></div>
+<div id="toastHost"></div>
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

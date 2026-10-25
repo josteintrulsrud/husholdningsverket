@@ -1,0 +1,13 @@
+{
+  "name": "husholdningsverket",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev",
+    "db:local": "wrangler d1 migrations apply husholdningsverket --local",
+    "db:remote": "wrangler d1 migrations apply husholdningsverket --remote"
+  },
+  "devDependencies": {
+    "wrangler": "^4.20.0"
+  }
+}

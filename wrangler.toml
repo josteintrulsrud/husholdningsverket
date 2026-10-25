@@ -1,0 +1,14 @@
+name = "husholdningsverket"
+pages_build_output_dir = "public"
+compatibility_date = "2026-06-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "husholdningsverket"
+database_id = "LIM-INN-ID-FRA-STEG-2"
+migrations_dir = "migrations"
+
+[vars]
+MAIL_FROM = "Husholdningsverket <noreply@mail.trulsrud.com>"
+AI_MODEL_FAST = "claude-haiku-5-5"
+AI_MODEL_VISION = "claude-sonnet-5-5"

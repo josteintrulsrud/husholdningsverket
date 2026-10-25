@@ -1,0 +1,9 @@
+# Kopier denne filen til .dev.vars for lokal utvikling. .dev.vars skal ALDRI inn i Git.
+# I produksjon legges de samme verdiene inn som secrets i Cloudflare Pages.
+
+SUPERADMIN_EMAIL=din@epost.no
+RESEND_API_KEY=re_xxx
+ANTHROPIC_API_KEY=sk-ant-xxx
+
+# DEV=1 viser innloggingslenken direkte i appen i stedet for å kreve e-post (kun lokalt!)
+DEV=1
