@@ -5,7 +5,7 @@ compatibility_date = "2026-06-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "husholdningsverket"
-database_id = "LIM-INN-ID-FRA-STEG-2"
+database_id = "377e83db-37b5-4157-acb7-760231105f23"
 migrations_dir = "migrations"
 
 [vars]
