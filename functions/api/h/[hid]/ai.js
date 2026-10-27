@@ -25,6 +25,26 @@ Svar KUN med JSON: [{"i":0,"kategori":"<id>"}]. Utelat transaksjoner du er svær
       return json({ suggestions: out });
     }
 
+    if (b.task === 'groups') {
+      const items = (b.groups || []).slice(0, 100).map((g, i) => ({
+        i, butikk: String(g.key).slice(0, 60), eksempel: String((g.samples || [])[0] || '').slice(0, 100),
+        antall: Number(g.count) || 1, snitt_kr: Math.round((Number(g.sumOre) || 0) / (Number(g.count) || 1) / 100),
+      }));
+      if (!items.length) return json({ suggestions: [] });
+      const text = await askClaude(env, {
+        model: fast, maxTokens: 4000,
+        content: `Du kategoriserer grupper av banktransaksjoner for en norsk husholdning. Hver gruppe er én butikk eller mottaker.
+Kategorier (bruk kun disse id-ene): ${JSON.stringify(cats.map((c) => ({ id: c.id, navn: c.name, type: c.kind })))}
+Negativt snitt er utgifter, positivt er inntekter. Overføring til sparekonto er sparing.
+Grupper: ${JSON.stringify(items)}
+Svar KUN med JSON: [{"i":0,"kategori":"<id>"}]. Utelat grupper du er usikker på (f.eks. Vipps til privatpersoner eller uklare overføringer).`,
+      });
+      const ids = new Set(cats.map((c) => c.id));
+      const out = parseJson(text).filter((r) => Number.isInteger(r.i) && items[r.i] && ids.has(r.kategori))
+        .map((r) => ({ key: b.groups[r.i].key, categoryId: r.kategori }));
+      return json({ suggestions: out });
+    }
+
     if (b.task === 'receipt') {
       const media = String(b.mediaType || 'image/jpeg');
       if (!/^image\/(jpeg|png|webp|gif)$/.test(media) || !b.image) return bad('Mangler bilde');

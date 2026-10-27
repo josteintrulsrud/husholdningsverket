@@ -28,7 +28,7 @@ export function merchantKey(text) {
   return (w.slice(0, 2).join(' ') || t).slice(0, 30);
 }
 export function matchRule(rules, text) {
-  const T = ' ' + String(text).toUpperCase() + ' ';
+  const T = ' ' + String(text).toUpperCase().replace(/\s+/g, ' ') + ' ';
   let best = null;
   for (const r of rules) { const m = r.match_text.toUpperCase(); if (m && T.includes(m) && (!best || m.length > best.match_text.length)) best = r; }
   return best ? best.category_id : null;

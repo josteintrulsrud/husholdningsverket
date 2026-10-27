@@ -1,6 +1,6 @@
 import { json, bad, readJson } from '../../../../lib/http.js';
 import { uuid } from '../../../../lib/crypto.js';
-import { merchantKey, applyRules } from '../../../../lib/rules.js';
+import { ruleKey, isGenericKey, applyRules } from '../../../../lib/rules.js';
 
 const ym = (s) => /^\d{4}-\d{2}$/.test(s || '');
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
@@ -50,8 +50,8 @@ export async function onRequestPatch({ request, env, data }) {
 
   let rule = null, applied = 0;
   if (catId && b.createRule) {
-    const key = merchantKey(t.description);
-    if (key.length >= 2) {
+    const key = ruleKey(t.description);
+    if (key.length >= 2 && !isGenericKey(key)) {
       const ex = await env.DB.prepare('SELECT id FROM category_rules WHERE household_id = ? AND upper(match_text) = ?').bind(data.hid, key).first();
       if (ex) await env.DB.prepare('UPDATE category_rules SET category_id = ? WHERE id = ?').bind(catId, ex.id).run();
       else await env.DB.prepare('INSERT INTO category_rules (id, household_id, match_text, category_id) VALUES (?, ?, ?, ?)').bind(uuid(), data.hid, key, catId).run();

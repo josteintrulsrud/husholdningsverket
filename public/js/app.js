@@ -12,6 +12,7 @@ import { vKvittering, receiptMatch, receiptShopHits } from './views/kvittering.j
 import { vWrap, wrapKey, wrapFacts } from './views/wrap.js';
 import { vMedlemmer } from './views/medlemmer.js';
 import { vAdmin } from './views/admin.js';
+import { vKategoriser } from './views/kategoriser.js';
 
 const $ = (id) => document.getElementById(id);
 let authState = {};
@@ -20,14 +21,14 @@ let shopTimer = null;
 
 /* ---------- Tegning ---------- */
 const VIEWS = [
-  ['oversikt', 'Oversikt'], ['wrap', 'Måneden din'], ['mat', 'Handleliste mat'], ['hjem', 'Hus og hjem'],
+  ['oversikt', 'Oversikt'], ['kategoriser', 'Kategoriser'], ['wrap', 'Måneden din'], ['mat', 'Handleliste mat'], ['hjem', 'Hus og hjem'],
   ['transaksjoner', 'Transaksjoner'], ['budsjett', 'Budsjett og sparemål'], ['import', 'Import'],
   ['regler', 'Kategoriregler'], ['medlemmer', 'Medlemmer'],
 ];
 const RENDER = {
   oversikt: vOversikt, wrap: vWrap, mat: () => vHandleliste('mat'), hjem: () => vHandleliste('hjem'),
   transaksjoner: vTransaksjoner, budsjett: vBudsjett, import: vImport, regler: vRegler,
-  medlemmer: vMedlemmer, kvittering: vKvittering, admin: vAdmin,
+  medlemmer: vMedlemmer, kvittering: vKvittering, admin: vAdmin, kategoriser: vKategoriser,
 };
 
 function showApp(on) {
@@ -41,8 +42,9 @@ function renderNav() {
   const views = S.hid ? [...VIEWS] : [];
   if (S.me?.isSuperadmin) views.push(['admin', 'Husholdninger (admin)']);
   $('nav').innerHTML = views.map(([id, label]) => {
-    const n = id === 'transaksjoner' ? pend : (id === 'mat' || id === 'hjem') ? open(id) : 0;
-    return `<button data-action="go" data-view="${id}" ${S.view === id ? 'aria-current="page"' : ''}><span>${label}</span>${n ? `<span class="count ${id === 'transaksjoner' ? '' : 'neutral'}">${n}</span>` : ''}</button>`;
+    const n = id === 'transaksjoner' ? pend : id === 'kategoriser' ? (S.groups?.total || 0) : (id === 'mat' || id === 'hjem') ? open(id) : 0;
+    const warn = id === 'transaksjoner' || id === 'kategoriser';
+    return `<button data-action="go" data-view="${id}" ${S.view === id ? 'aria-current="page"' : ''}><span>${label}</span>${n ? `<span class="count ${warn ? '' : 'neutral'}">${n}</span>` : ''}</button>`;
   }).join('');
 }
 
@@ -87,7 +89,7 @@ async function boot() {
 }
 
 async function loadHousehold() {
-  S.settings = null; S.tx = {}; S.shop = []; loadedMonths = new Set();
+  S.settings = null; S.tx = {}; S.shop = []; S.groups = null; loadedMonths = new Set();
   S.role = S.households.find((h) => h.id === S.hid)?.role;
   localStorage.setItem('hv_hid', S.hid);
   render();
@@ -95,9 +97,25 @@ async function loadHousehold() {
   await ensureMonths([S.month, ymShift(S.month, -1)]);
   render();
   startShopPolling();
+  refreshGroups();
 }
 
 async function loadSettings() { S.settings = mapSettings(await hapi('/settings')); }
+async function loadGroups() {
+  const d = await hapi('/groups');
+  const prev = S.groups;
+  S.groups = { total: d.total, groups: d.groups, sug: prev?.sug || {}, shown: prev?.shown || 40 };
+  for (const k of Object.keys(S.groups.sug)) if (!d.groups.some((g) => g.key === k)) delete S.groups.sug[k];
+}
+function refreshGroups() {
+  loadGroups().then(() => (['oversikt', 'kategoriser'].includes(S.view) ? render() : renderNav())).catch(() => {});
+}
+async function categorizeGroups(groups, by) {
+  const r = await hapi('/groups', { method: 'POST', body: { groups, by } });
+  await Promise.all([loadGroups(), loadSettings(), reloadTx()]);
+  render();
+  toast(`${r.updated} transaksjoner kategorisert${r.rules ? `, ${r.rules === 1 ? '1 regel' : r.rules + ' regler'} lagret` : ''}.`);
+}
 async function loadShop() { S.shop = (await hapi('/shopping')).items.map(mapItem); }
 
 async function ensureMonths(yms) {
@@ -140,6 +158,7 @@ async function setCategory(id, categoryId, by) {
   t.cat = categoryId || null; t.by = categoryId ? by : null; delete t.sug;
   if (r.rule) {
     await Promise.all([loadSettings(), reloadTx()]);
+    refreshGroups();
     toast(`Regel lagret: «${r.rule}» → ${catName(categoryId)}${r.applied ? `. ${r.applied} til fikk samme kategori.` : ''}`);
   }
   render();
@@ -170,6 +189,7 @@ const actions = {
     if (b.dataset.filter) S.filter.cat = b.dataset.filter;
     render(); window.scrollTo({ top: 0 });
     if (S.view === 'admin') await loadAdmin();
+    if (S.view === 'kategoriser') { await loadGroups(); render(); }
   },
   async prevMonth() { S.month = ymShift(S.month, -1); render(); await ensureMonths([S.month, ymShift(S.month, -1)]); render(); },
   async nextMonth() { S.month = ymShift(S.month, 1); render(); await ensureMonths([S.month, ymShift(S.month, -1)]); render(); },
@@ -214,10 +234,35 @@ const actions = {
       const months = [...new Set(items.map((t) => t.date.slice(0, 7)))];
       S.imp = null; S.month = latest; S.view = 'oversikt';
       await reloadTx(); await ensureMonths([...months, ymShift(latest, -1)]);
+      refreshGroups();
       toast(`${tot.inserted} nye transaksjoner${tot.duplicates ? `, ${tot.duplicates} fantes fra før` : ''}${tot.merged ? `, ${tot.merged} koblet til kvitteringer` : ''}.`);
     } finally { S.busy.import = false; render(); }
   },
 
+  async acceptGroup(b) {
+    const key = b.dataset.key, cat = S.groups?.sug[key];
+    if (cat) await categorizeGroups([{ key, categoryId: cat }], 'ai');
+  },
+  async acceptAllGroups() {
+    const list = S.groups.groups.filter((g) => S.groups.sug[g.key]).map((g) => ({ key: g.key, categoryId: S.groups.sug[g.key] }));
+    if (!list.length) return;
+    S.busy.accept = true; render();
+    try { await categorizeGroups(list, 'ai'); } finally { S.busy.accept = false; render(); }
+  },
+  async aiGroups() {
+    const G = S.groups; if (!G?.groups.length) return;
+    S.busy.groups = true; render();
+    try {
+      const todo = G.groups.filter((g) => !G.sug[g.key]);
+      let n = 0;
+      for (let i = 0; i < Math.min(todo.length, 300); i += 100) {
+        const r = await hapi('/ai', { method: 'POST', body: { task: 'groups', groups: todo.slice(i, i + 100) } });
+        for (const s of r.suggestions) { G.sug[s.key] = s.categoryId; n++; }
+      }
+      toast(n ? `Claude foreslo kategori for ${n} butikker. Se over og godta.` : 'Claude fant ingen sikre forslag.');
+    } finally { S.busy.groups = false; render(); }
+  },
+  moreGroups() { S.groups.shown += 40; render(); },
   cancelReceipt() { S.receipt = null; S.view = 'oversikt'; render(); },
 
   async delItem(b) { await hapi(`/shopping?id=${encodeURIComponent(b.dataset.id)}`, { method: 'DELETE' }); S.shop = S.shop.filter((x) => x.id !== b.dataset.id); render(); },
@@ -271,6 +316,7 @@ const changes = {
     await hapi('/shopping', { method: 'PATCH', body: { id: x.id, done: el.checked } });
     await loadShop(); render();
   },
+  groupCat(el) { if (el.value) return categorizeGroups([{ key: el.dataset.key, categoryId: el.value }], 'manuell'); },
   wrapWho(el) { S.wrapWho = el.value; render(); },
   async switchHousehold(el) { S.hid = el.value; S.view = 'oversikt'; await loadHousehold(); },
 };

@@ -19,6 +19,7 @@ export const S = {
   wrapWho: null,        // hvem «Måneden din» viser (bruker-id eller 'alle')
   busy: {},
   admin: null,
+  groups: null,         // ukategoriserte transaksjoner gruppert per butikk
 };
 
 export const cat = (id) => S.settings?.categories.find((c) => c.id === id);
