@@ -16,7 +16,7 @@ export async function onRequestPost({ request, env, data }) {
       const items = (b.items || []).slice(0, 40).map((t, i) => ({ i, tekst: String(t.text).slice(0, 120), belop_kr: Number(t.amountOre) / 100 }));
       if (!items.length) return json({ suggestions: [] });
       const text = await askClaude(env, {
-        model: fast, maxTokens: 2000,
+        model: fast, maxTokens: 8000, effort: 'low',
         content: `Du kategoriserer banktransaksjoner for en norsk husholdning.
 Kategorier (bruk kun disse numrene): ${catList}
 Negative beløp er utgifter, positive er inntekter. Overføring til sparekonto er sparing.
@@ -34,7 +34,7 @@ Svar KUN med JSON på én linje: [{"i":0,"k":1}]. Utelat transaksjoner du er sv�
       }));
       if (!items.length) return json({ suggestions: [] });
       const text = await askClaude(env, {
-        model: fast, maxTokens: 4000,
+        model: fast, maxTokens: 16000, effort: 'low',
         content: `Du kategoriserer grupper av banktransaksjoner for en norsk husholdning. Hver gruppe er én butikk eller mottaker.
 Kategorier (bruk kun disse numrene): ${catList}
 Negativt snitt er utgifter, positivt er inntekter. Overføring til sparekonto er sparing.
@@ -52,7 +52,7 @@ Svar KUN med JSON på én linje: [{"i":0,"k":1}]. Utelat grupper du er usikker p
       if (b.image.length > 6_000_000) return bad('Bildet er for stort');
       const exp = cats.filter((c) => c.kind === 'utgift').map((c) => ({ id: c.id, navn: c.name }));
       const text = await askClaude(env, {
-        model: vision, maxTokens: 2000,
+        model: vision, maxTokens: 16000,
         content: [
           { type: 'image', source: { type: 'base64', media_type: media, data: b.image } },
           { type: 'text', text: `Les denne norske kvitteringen. Svar KUN med JSON:
@@ -73,7 +73,7 @@ total_kr er totalsummen som ble betalt, som positivt tall. Bruk null for felt du
 
     if (b.task === 'wrap') {
       const text = await askClaude(env, {
-        model: fast, maxTokens: 400,
+        model: fast, maxTokens: 4000, effort: 'low',
         content: `Skriv en kort, morsom og varm månedsoppsummering på norsk bokmål (2–3 setninger, maks 60 ord) til et familiemedlem, i stil med Spotify Wrapped. Vær leken, men aldri belærende eller dømmende om forbruk. Ingen emoji, ingen overskrift. Bruk bare disse tallene: ${JSON.stringify(b.facts || {}).slice(0, 3000)}`,
       });
       return json({ text });
