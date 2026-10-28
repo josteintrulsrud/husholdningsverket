@@ -1,6 +1,7 @@
 import { S, monthTx, monthStats, catName, allTx } from '../state.js';
 import { esc, kr, ymLabel, ymNow, ymShift, monthName } from '../util.js';
 import { txTable, pendingList, bar } from './parts.js';
+import { bigCosts, BIG_ORE } from '../storekjop.js';
 
 function wrapBanner() {
   const prev = ymShift(ymNow(), -1);
@@ -33,6 +34,9 @@ export function vOversikt() {
   const pend = monthTx(S.month).filter((t) => !t.cat);
   const recent = monthTx(S.month).slice(0, 6);
   const goals = S.settings.goals;
+  const big = bigCosts(S.month);
+  const bigSum = big.reduce((a, t) => a - t.amount, 0);
+  const bigIn = (id) => big.filter((t) => t.cat === id);
 
   return `
   <div style="display:flex;flex-direction:column;gap:4px"><h1>${ymLabel(S.month)}</h1>
@@ -50,7 +54,9 @@ export function vOversikt() {
       ${cats.map((c) => {
         const sp = st.per[c.id] || 0, b = c.budget || 0, over = b ? sp > b : sp > 0;
         const pct = b ? Math.min(100, Math.round(sp / b * 100)) : (sp ? 100 : 0);
-        return `<div class="brow"><div class="t"><span>${esc(c.name)}</span><span class="${over ? 'over' : ''}">${kr(sp)} <span class="muted" style="font-weight:400">/ ${b ? kr(b) : 'uten budsjett'}</span></span></div>${bar(pct, over, pct + ' prosent brukt')}</div>`;
+        const why = over ? bigIn(c.id) : [];
+        return `<div class="brow"><div class="t"><span>${esc(c.name)}</span><span class="${over ? 'over' : ''}">${kr(sp)} <span class="muted" style="font-weight:400">/ ${b ? kr(b) : 'uten budsjett'}</span></span></div>${bar(pct, over, pct + ' prosent brukt')}
+          ${why.length ? `<p class="muted" style="font-size:13px;margin:0">Store kjøp: ${why.slice(0, 3).map((t) => `${esc(t.text)} (${kr(-t.amount)})`).join(', ')}${why.length > 3 ? ` og ${why.length - 3} til` : ''}</p>` : ''}</div>`;
       }).join('')}
       ${st.per._none ? `<p class="muted" style="font-size:14px">${kr(st.per._none)} i utgifter er ikke kategorisert ennå.</p>` : ''}
     </section>
@@ -67,6 +73,12 @@ export function vOversikt() {
       </section>
     </div>
   </div>
+  <section class="panel" aria-labelledby="h-big">
+    <div class="panel-head"><h2 id="h-big">Store og uforutsette utgifter</h2>${big.length ? `<span class="pill warn">${kr(bigSum)}</span>` : ''}</div>
+    ${big.length
+      ? `<p class="muted" style="font-size:14px;margin:0">${big.length === 1 ? 'Ett kjøp' : big.length + ' kjøp'} over ${kr(BIG_ORE)} som ikke er faste trekk.${left < 0 ? ` Uten ${big.length === 1 ? 'det' : 'disse'} ville dere vært ${kr(Math.abs(left + bigSum))} ${left + bigSum >= 0 ? 'under' : 'over'} budsjettet.` : ''}</p>${txTable(big, false)}`
+      : `<p class="muted" style="font-size:14px">Ingen enkeltkjøp over ${kr(BIG_ORE)} utenom faste trekk i ${monthName(S.month)}.</p>`}
+  </section>
   <section class="panel" aria-labelledby="h-r">
     <div class="panel-head"><h2 id="h-r">Siste transaksjoner</h2><button class="btn small" data-action="go" data-view="transaksjoner">Se alle</button></div>
     ${recent.length ? txTable(recent, false) : `<p class="muted">Ingen transaksjoner i ${monthName(S.month)}.</p>`}

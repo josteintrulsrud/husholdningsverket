@@ -13,6 +13,7 @@ import { vWrap, wrapKey, wrapFacts } from './views/wrap.js';
 import { vMedlemmer } from './views/medlemmer.js';
 import { vAdmin } from './views/admin.js';
 import { vKategoriser } from './views/kategoriser.js';
+import { monthWindow } from './storekjop.js';
 
 const $ = (id) => document.getElementById(id);
 let authState = {};
@@ -94,7 +95,7 @@ async function loadHousehold() {
   localStorage.setItem('hv_hid', S.hid);
   render();
   await Promise.all([loadSettings(), loadShop()]);
-  await ensureMonths([S.month, ymShift(S.month, -1)]);
+  await ensureMonths(monthWindow(S.month));
   render();
   startShopPolling();
   refreshGroups();
@@ -196,9 +197,9 @@ const actions = {
     if (S.view === 'admin') await loadAdmin();
     if (S.view === 'kategoriser') { await loadGroups(); render(); }
   },
-  async prevMonth() { S.month = ymShift(S.month, -1); render(); await ensureMonths([S.month, ymShift(S.month, -1)]); render(); },
-  async nextMonth() { S.month = ymShift(S.month, 1); render(); await ensureMonths([S.month, ymShift(S.month, -1)]); render(); },
-  async openWrap(b) { S.month = b.dataset.ym; S.view = 'wrap'; render(); window.scrollTo({ top: 0 }); await ensureMonths([S.month, ymShift(S.month, -1)]); render(); },
+  async prevMonth() { S.month = ymShift(S.month, -1); render(); await ensureMonths(monthWindow(S.month)); render(); },
+  async nextMonth() { S.month = ymShift(S.month, 1); render(); await ensureMonths(monthWindow(S.month)); render(); },
+  async openWrap(b) { S.month = b.dataset.ym; S.view = 'wrap'; render(); window.scrollTo({ top: 0 }); await ensureMonths(monthWindow(S.month)); render(); },
   loginAgain() { authState = { email: authState.email }; render(); },
   async logout() { await api('/auth/logout', { method: 'POST' }); location.reload(); },
 
@@ -238,7 +239,7 @@ const actions = {
       const latest = items.map((t) => t.date.slice(0, 7)).sort().pop();
       const months = [...new Set(items.map((t) => t.date.slice(0, 7)))];
       S.imp = null; S.month = latest; S.view = 'oversikt';
-      await reloadTx(); await ensureMonths([...months, ymShift(latest, -1)]);
+      await reloadTx(); await ensureMonths([...months, ...monthWindow(latest)]);
       refreshGroups();
       toast(`${tot.inserted} nye transaksjoner${tot.duplicates ? `, ${tot.duplicates} fantes fra før` : ''}${tot.merged ? `, ${tot.merged} koblet til kvitteringer` : ''}.`);
     } finally { S.busy.import = false; render(); }
@@ -380,7 +381,7 @@ const submits = {
     else await hapi('/transactions', { method: 'POST', body: { date, amountOre: -total, text: store, categoryId, receipt, receiptPending: true } });
     if (hits.length) await hapi('/shopping', { method: 'PATCH', body: { ids: hits.map((h) => h.id), done: true } });
     S.receipt = null; S.view = 'oversikt'; S.month = date.slice(0, 7);
-    await Promise.all([reloadTx(), loadShop()]); await ensureMonths([S.month, ymShift(S.month, -1)]);
+    await Promise.all([reloadTx(), loadShop()]); await ensureMonths(monthWindow(S.month));
     render();
     toast(`Kvitteringen er lagret${hits.length ? ` og ${hits.length} varer er huket av på handlelisten` : ''}.`);
   },
