@@ -111,7 +111,12 @@ function refreshGroups() {
   loadGroups().then(() => (['oversikt', 'kategoriser'].includes(S.view) ? render() : renderNav())).catch(() => {});
 }
 async function categorizeGroups(groups, by) {
-  const r = await hapi('/groups', { method: 'POST', body: { groups, by } });
+  // Serveren tar maks 200 grupper per kall
+  const r = { updated: 0, rules: 0 };
+  for (let i = 0; i < groups.length; i += 200) {
+    const d = await hapi('/groups', { method: 'POST', body: { groups: groups.slice(i, i + 200), by } });
+    r.updated += d.updated || 0; r.rules += d.rules || 0;
+  }
   await Promise.all([loadGroups(), loadSettings(), reloadTx()]);
   render();
   toast(`${r.updated} transaksjoner kategorisert${r.rules ? `, ${r.rules === 1 ? '1 regel' : r.rules + ' regler'} lagret` : ''}.`);
@@ -251,16 +256,20 @@ const actions = {
   },
   async aiGroups() {
     const G = S.groups; if (!G?.groups.length) return;
-    S.busy.groups = true; render();
+    const todo = G.groups.filter((g) => !G.sug[g.key]).slice(0, 500);
+    const batches = Math.ceil(todo.length / 50);
+    let n = 0, failed = 0, lastError = '';
     try {
-      const todo = G.groups.filter((g) => !G.sug[g.key]);
-      let n = 0;
-      for (let i = 0; i < Math.min(todo.length, 300); i += 100) {
-        const r = await hapi('/ai', { method: 'POST', body: { task: 'groups', groups: todo.slice(i, i + 100) } });
-        for (const s of r.suggestions) { G.sug[s.key] = s.categoryId; n++; }
+      for (let b = 0; b < batches; b++) {
+        S.busy.groups = batches > 1 ? `${b + 1} av ${batches}` : true; render();
+        try {
+          const r = await hapi('/ai', { method: 'POST', body: { task: 'groups', groups: todo.slice(b * 50, b * 50 + 50) } });
+          for (const s of r.suggestions) { G.sug[s.key] = s.categoryId; n++; }
+        } catch (e) { failed++; lastError = e.message; console.error(e); }
       }
-      toast(n ? `Claude foreslo kategori for ${n} butikker. Se over og godta.` : 'Claude fant ingen sikre forslag.');
     } finally { S.busy.groups = false; render(); }
+    if (failed === batches) throw new Error(lastError || 'Claude svarte ikke. Prøv igjen.');
+    toast(`${n ? `Claude foreslo kategori for ${n} av ${todo.length} butikker. Se over og godta.` : 'Claude fant ingen sikre forslag.'}${failed ? ` ${failed} av ${batches} runder feilet, trykk igjen for resten.` : ''}`);
   },
   moreGroups() { S.groups.shown += 40; render(); },
   cancelReceipt() { S.receipt = null; S.view = 'oversikt'; render(); },

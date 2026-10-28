@@ -18,7 +18,7 @@ export function vKategoriser() {
   ${heading('Kategoriser', `${G.total} transaksjoner uten kategori, fordelt på ${G.groups.length} butikker og mottakere. Velg kategori én gang per butikk, så får alle transaksjonene den, og det lages en regel for senere importer.`)}
   <section class="panel">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-      <button class="btn primary" data-action="aiGroups" ${S.busy.groups ? 'disabled' : ''}>${S.busy.groups ? 'Claude foreslår…' : 'Foreslå kategorier med Claude'}</button>
+      <button class="btn primary" data-action="aiGroups" ${S.busy.groups ? 'disabled' : ''}>${S.busy.groups ? `Claude foreslår…${S.busy.groups === true ? '' : ` (${S.busy.groups})`}` : 'Foreslå kategorier med Claude'}</button>
       ${sugCount ? `<button class="btn" data-action="acceptAllGroups" ${S.busy.accept ? 'disabled' : ''}>${S.busy.accept ? 'Lagrer…' : `Godta alle ${sugCount} forslag`}</button>` : ''}
     </div>
     ${sugCount ? '<p class="muted" style="font-size:14px">Se over forslagene før du godtar alle. Du kan endre enkeltgrupper med nedtrekkslisten.</p>' : ''}

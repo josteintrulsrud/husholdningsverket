@@ -1,5 +1,5 @@
 import { json, bad, readJson } from '../../../../lib/http.js';
-import { askClaude, parseJson } from '../../../../lib/anthropic.js';
+import { askClaude, parseJson, parseList } from '../../../../lib/anthropic.js';
 
 // POST { task: 'categorize' | 'receipt' | 'wrap', ... } – Claude-funksjonene i appen.
 export async function onRequestPost({ request, env, data }) {
@@ -7,26 +7,28 @@ export async function onRequestPost({ request, env, data }) {
   const cats = (await env.DB.prepare('SELECT id, name, kind FROM categories WHERE household_id = ?').bind(data.hid).all()).results;
   const fast = env.AI_MODEL_FAST || 'claude-haiku-5-5';
   const vision = env.AI_MODEL_VISION || 'claude-sonnet-5-5';
+  // Claude får korte nummer i stedet for lange id-er, så svaret blir kort og ikke kuttes
+  const catList = JSON.stringify(cats.map((c, n) => ({ k: n + 1, navn: c.name, type: c.kind })));
+  const catId = (k) => cats[Number(k) - 1]?.id;
 
   try {
     if (b.task === 'categorize') {
       const items = (b.items || []).slice(0, 40).map((t, i) => ({ i, tekst: String(t.text).slice(0, 120), belop_kr: Number(t.amountOre) / 100 }));
       if (!items.length) return json({ suggestions: [] });
       const text = await askClaude(env, {
-        model: fast, maxTokens: 1500,
+        model: fast, maxTokens: 2000,
         content: `Du kategoriserer banktransaksjoner for en norsk husholdning.
-Kategorier (bruk kun disse id-ene): ${JSON.stringify(cats.map((c) => ({ id: c.id, navn: c.name, type: c.kind })))}
+Kategorier (bruk kun disse numrene): ${catList}
 Negative beløp er utgifter, positive er inntekter. Overføring til sparekonto er sparing.
 Transaksjoner: ${JSON.stringify(items)}
-Svar KUN med JSON: [{"i":0,"kategori":"<id>"}]. Utelat transaksjoner du er svært usikker på.`,
+Svar KUN med JSON på én linje: [{"i":0,"k":1}]. Utelat transaksjoner du er svært usikker på.`,
       });
-      const ids = new Set(cats.map((c) => c.id));
-      const out = parseJson(text).filter((r) => Number.isInteger(r.i) && ids.has(r.kategori)).map((r) => ({ i: r.i, categoryId: r.kategori }));
+      const out = parseList(text).filter((r) => Number.isInteger(r.i) && items[r.i] && catId(r.k)).map((r) => ({ i: r.i, categoryId: catId(r.k) }));
       return json({ suggestions: out });
     }
 
     if (b.task === 'groups') {
-      const items = (b.groups || []).slice(0, 100).map((g, i) => ({
+      const items = (b.groups || []).slice(0, 50).map((g, i) => ({
         i, butikk: String(g.key).slice(0, 60), eksempel: String((g.samples || [])[0] || '').slice(0, 100),
         antall: Number(g.count) || 1, snitt_kr: Math.round((Number(g.sumOre) || 0) / (Number(g.count) || 1) / 100),
       }));
@@ -34,14 +36,13 @@ Svar KUN med JSON: [{"i":0,"kategori":"<id>"}]. Utelat transaksjoner du er svær
       const text = await askClaude(env, {
         model: fast, maxTokens: 4000,
         content: `Du kategoriserer grupper av banktransaksjoner for en norsk husholdning. Hver gruppe er én butikk eller mottaker.
-Kategorier (bruk kun disse id-ene): ${JSON.stringify(cats.map((c) => ({ id: c.id, navn: c.name, type: c.kind })))}
+Kategorier (bruk kun disse numrene): ${catList}
 Negativt snitt er utgifter, positivt er inntekter. Overføring til sparekonto er sparing.
 Grupper: ${JSON.stringify(items)}
-Svar KUN med JSON: [{"i":0,"kategori":"<id>"}]. Utelat grupper du er usikker på (f.eks. Vipps til privatpersoner eller uklare overføringer).`,
+Svar KUN med JSON på én linje: [{"i":0,"k":1}]. Utelat grupper du er usikker på (f.eks. Vipps til privatpersoner eller uklare overføringer).`,
       });
-      const ids = new Set(cats.map((c) => c.id));
-      const out = parseJson(text).filter((r) => Number.isInteger(r.i) && items[r.i] && ids.has(r.kategori))
-        .map((r) => ({ key: b.groups[r.i].key, categoryId: r.kategori }));
+      const out = parseList(text).filter((r) => Number.isInteger(r.i) && items[r.i] && catId(r.k))
+        .map((r) => ({ key: b.groups[r.i].key, categoryId: catId(r.k) }));
       return json({ suggestions: out });
     }
 
