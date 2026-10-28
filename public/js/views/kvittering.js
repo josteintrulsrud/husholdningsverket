@@ -1,10 +1,17 @@
 import { S, allTx, catOptions } from '../state.js';
 import { esc, kr, dateLabel } from '../util.js';
 
+// Forhåndsvisning av koblingen. Selve koblingen gjøres på serveren med samme regel (lib/receipts.js).
 export function receiptMatch(R) {
   if (!R || R.total == null) return null;
   const d0 = Date.parse(R.date);
-  return allTx().find((t) => !t.receipt && t.amount === -R.total && Math.abs(Date.parse(t.date) - d0) <= 3 * 864e5) || null;
+  let best = null, bestDiff = Infinity;
+  for (const t of allTx()) {
+    if (t.receipt || t.amount !== -R.total) continue;
+    const diff = Math.abs(Date.parse(t.date) - d0);
+    if (diff <= 5 * 864e5 && diff < bestDiff) { best = t; bestDiff = diff; }
+  }
+  return best;
 }
 
 export function receiptShopHits(R) {
@@ -24,6 +31,7 @@ export function vKvittering() {
   return `
   <div style="display:flex;flex-direction:column;gap:4px"><h1>Kontroller kvitteringen</h1><p class="lead">Rett opp det Claude kan ha lest feil før du lagrer.</p></div>
   <section class="panel">
+    ${R.img ? `<img src="data:${R.img.mediaType};base64,${R.img.data}" alt="Bildet av kvitteringen" style="max-width:180px;max-height:240px;border-radius:10px;object-fit:contain;align-self:flex-start">` : ''}
     <form class="formgrid" data-submit="saveReceipt">
       <label class="f">Butikk<input class="inp" name="store" value="${esc(R.store)}" required></label>
       <label class="f">Dato<input class="inp" type="date" name="date" value="${R.date}" required></label>

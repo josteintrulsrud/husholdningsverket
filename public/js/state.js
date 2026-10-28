@@ -15,6 +15,7 @@ export const S = {
   autoRules: true,
   imp: null,            // CSV-import under arbeid
   receipt: null,        // kvittering under kontroll
+  receipts: null,       // arkivet under «Mine kvitteringer»
   wrapText: {},         // AI-tekst per måned+person
   wrapWho: null,        // hvem «Måneden din» viser (bruker-id eller 'alle')
   busy: {},

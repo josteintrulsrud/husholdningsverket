@@ -65,6 +65,8 @@ export async function onRequestPatch({ request, env, data }) {
 // DELETE ?id=
 export async function onRequestDelete({ request, env, data }) {
   const id = new URL(request.url).searchParams.get('id');
+  const t = await env.DB.prepare('SELECT receipt_image FROM transactions WHERE id = ? AND household_id = ?').bind(id, data.hid).first();
+  if (t?.receipt_image && env.RECEIPTS) await env.RECEIPTS.delete(t.receipt_image);
   await env.DB.prepare('DELETE FROM transactions WHERE id = ? AND household_id = ?').bind(id, data.hid).run();
   return json({ ok: true });
 }

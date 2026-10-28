@@ -47,7 +47,9 @@ Uten `ANTHROPIC_API_KEY` virker alt unntatt kvitteringslesing og Claude-forslag.
 4. Legg inn secrets under Settings → Variables and Secrets:
    `SUPERADMIN_EMAIL`, `RESEND_API_KEY`, `ANTHROPIC_API_KEY` (IKKE `DEV`)
 5. Bind D1-databasen som `DB` hvis den ikke plukkes opp fra `wrangler.toml`
-6. Eget domene: CNAME `husholdningsverket` → `husholdningsverket.pages.dev` hos Webshop, og legg til domenet under Custom domains i Pages
+6. Bilder av kvitteringer: `npx wrangler r2 bucket create husholdningsverket-kvitteringer`
+   (bindes som `RECEIPTS` via `wrangler.toml`; uten den lagres kvitteringene uten bilde)
+7. Eget domene: CNAME `husholdningsverket` → `husholdningsverket.pages.dev` hos Webshop, og legg til domenet under Custom domains i Pages
 
 ## Første innlogging
 

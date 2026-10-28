@@ -8,6 +8,11 @@ database_name = "husholdningsverket"
 database_id = "377e83db-37b5-4157-acb7-760231105f23"
 migrations_dir = "migrations"
 
+# Bilder av kvitteringer
+[[r2_buckets]]
+binding = "RECEIPTS"
+bucket_name = "husholdningsverket-kvitteringer"
+
 [vars]
 MAIL_FROM = "Husholdningsverket <noreply@mail.trulsrud.com>"
 AI_MODEL_FAST = "claude-haiku-5-5"

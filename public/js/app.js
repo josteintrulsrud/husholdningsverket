@@ -8,7 +8,8 @@ import { vBudsjett } from './views/budsjett.js';
 import { vRegler } from './views/regler.js';
 import { vImport, buildImport } from './views/import.js';
 import { vHandleliste } from './views/handleliste.js';
-import { vKvittering, receiptMatch, receiptShopHits } from './views/kvittering.js';
+import { vKvittering, receiptShopHits } from './views/kvittering.js';
+import { vKvitteringer } from './views/kvitteringer.js';
 import { vWrap, wrapKey, wrapFacts } from './views/wrap.js';
 import { vMedlemmer } from './views/medlemmer.js';
 import { vAdmin } from './views/admin.js';
@@ -23,13 +24,14 @@ let shopTimer = null;
 /* ---------- Tegning ---------- */
 const VIEWS = [
   ['oversikt', 'Oversikt'], ['kategoriser', 'Kategoriser'], ['wrap', 'Måneden din'], ['mat', 'Handleliste mat'], ['hjem', 'Hus og hjem'],
-  ['transaksjoner', 'Transaksjoner'], ['budsjett', 'Budsjett og sparemål'], ['import', 'Import'],
+  ['transaksjoner', 'Transaksjoner'], ['kvitteringer', 'Mine kvitteringer'], ['budsjett', 'Budsjett og sparemål'], ['import', 'Import'],
   ['regler', 'Kategoriregler'], ['medlemmer', 'Medlemmer'],
 ];
 const RENDER = {
   oversikt: vOversikt, wrap: vWrap, mat: () => vHandleliste('mat'), hjem: () => vHandleliste('hjem'),
   transaksjoner: vTransaksjoner, budsjett: vBudsjett, import: vImport, regler: vRegler,
   medlemmer: vMedlemmer, kvittering: vKvittering, admin: vAdmin, kategoriser: vKategoriser,
+  kvitteringer: vKvitteringer,
 };
 
 function showApp(on) {
@@ -90,7 +92,7 @@ async function boot() {
 }
 
 async function loadHousehold() {
-  S.settings = null; S.tx = {}; S.shop = []; S.groups = null; loadedMonths = new Set();
+  S.settings = null; S.tx = {}; S.shop = []; S.groups = null; S.receipts = null; loadedMonths = new Set();
   S.role = S.households.find((h) => h.id === S.hid)?.role;
   localStorage.setItem('hv_hid', S.hid);
   render();
@@ -175,11 +177,19 @@ async function scanReceipt(file) {
   try {
     const img = await imageToBase64(file);
     const r = await hapi('/ai', { method: 'POST', body: { task: 'receipt', image: img.data, mediaType: img.mediaType } });
-    S.receipt = { busy: false, store: r.store, date: r.date || todayIso(), total: r.totalOre, cat: cat(r.categoryId) ? r.categoryId : null, items: r.items || [] };
+    S.receipt = { busy: false, store: r.store, date: r.date || todayIso(), total: r.totalOre, cat: cat(r.categoryId) ? r.categoryId : null, items: r.items || [], img };
   } catch (e) {
     S.receipt = { busy: false, error: e.message || 'Klarte ikke å lese kvitteringen. Prøv et skarpere bilde med hele kvitteringen synlig.' };
   }
   render();
+}
+
+async function loadReceipts() {
+  S.receipts = (await hapi('/receipts')).receipts.map((r) => {
+    let receipt = {};
+    try { receipt = JSON.parse(r.receipt_json) || {}; } catch { /* */ }
+    return { id: r.id, userId: r.user_id, date: r.date, amount: r.amount_ore, text: r.description, bank: r.bank_text, cat: r.category_id, receipt, pending: !!r.receipt_pending, hasImg: !!r.receipt_image };
+  });
 }
 
 function startImport(text) {
@@ -196,6 +206,15 @@ const actions = {
     render(); window.scrollTo({ top: 0 });
     if (S.view === 'admin') await loadAdmin();
     if (S.view === 'kategoriser') { await loadGroups(); render(); }
+    if (S.view === 'kvitteringer') { await loadReceipts(); render(); }
+  },
+  async delReceipt(b) {
+    if (!confirm(b.dataset.pending
+      ? 'Slette kvitteringen? Den har ikke kommet på kontoutskriften ennå, så utgiften slettes også.'
+      : 'Slette kvitteringen? Kortkjøpet fra banken blir liggende.')) return;
+    await hapi(`/receipts?id=${encodeURIComponent(b.dataset.id)}`, { method: 'DELETE' });
+    await Promise.all([loadReceipts(), reloadTx()]);
+    render();
   },
   async prevMonth() { S.month = ymShift(S.month, -1); render(); await ensureMonths(monthWindow(S.month)); render(); },
   async nextMonth() { S.month = ymShift(S.month, 1); render(); await ensureMonths(monthWindow(S.month)); render(); },
@@ -374,16 +393,14 @@ const submits = {
     const fd = new FormData(form);
     const store = String(fd.get('store')).trim(), date = fd.get('date'), total = parseNum(fd.get('total')), categoryId = fd.get('cat') || null;
     if (!store || !date || isNaN(total) || total <= 0) { toast('Fyll inn butikk, dato og sum.'); return; }
-    const receipt = { store, items: R.items };
     const hits = fd.get('tick') ? receiptShopHits(R) : [];
-    const m = receiptMatch({ ...R, date, total });
-    if (m) await hapi('/transactions', { method: 'PATCH', body: { id: m.id, categoryId, by: 'manuell', receipt } });
-    else await hapi('/transactions', { method: 'POST', body: { date, amountOre: -total, text: store, categoryId, receipt, receiptPending: true } });
+    // Serveren kobler kvitteringen til et kortkjøp som allerede er importert, så den ikke telles dobbelt
+    const r = await hapi('/receipts', { method: 'POST', body: { store, date, totalOre: total, categoryId, items: R.items, image: R.img?.data, mediaType: R.img?.mediaType } });
     if (hits.length) await hapi('/shopping', { method: 'PATCH', body: { ids: hits.map((h) => h.id), done: true } });
-    S.receipt = null; S.view = 'oversikt'; S.month = date.slice(0, 7);
-    await Promise.all([reloadTx(), loadShop()]); await ensureMonths(monthWindow(S.month));
-    render();
-    toast(`Kvitteringen er lagret${hits.length ? ` og ${hits.length} varer er huket av på handlelisten` : ''}.`);
+    S.receipt = null; S.view = 'kvitteringer'; S.month = date.slice(0, 7);
+    await Promise.all([reloadTx(), loadShop(), loadReceipts()]); await ensureMonths(monthWindow(S.month));
+    render(); window.scrollTo({ top: 0 });
+    toast(`${r.matched ? 'Kvitteringen er koblet til kortkjøpet fra banken' : 'Kvitteringen er lagret og kobles til kortkjøpet når du importerer kontoutskriften'}${hits.length ? `, og ${hits.length} varer er huket av på handlelisten` : ''}.${r.imageSaved || !R.img ? '' : ' Bildet ble ikke lagret.'}`);
   },
   async invite(form) {
     const fd = new FormData(form);

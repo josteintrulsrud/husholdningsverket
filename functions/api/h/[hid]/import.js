@@ -1,6 +1,7 @@
 import { json, bad, readJson } from '../../../../lib/http.js';
 import { uuid } from '../../../../lib/crypto.js';
 import { matchRule } from '../../../../lib/rules.js';
+import { closestMatch } from '../../../../lib/receipts.js';
 
 // POST { rows: [{ date, amountOre, text }] } – rader fra CSV, ferdig tolket i nettleseren.
 // Dubletter hoppes over, og kortkjøp kobles til kvitteringer som venter.
@@ -12,6 +13,10 @@ export async function onRequestPost({ request, env, data }) {
   const hid = data.hid;
   const rules = (await env.DB.prepare('SELECT match_text, category_id FROM category_rules WHERE household_id = ?').bind(hid).all()).results;
   const pending = (await env.DB.prepare('SELECT id, date, amount_ore FROM transactions WHERE household_id = ? AND receipt_pending = 1').bind(hid).all()).results;
+  // Rader som allerede er importert, skal ikke kobles til en kvittering på nytt
+  const dates = rows.map((r) => String(r.date || '')).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const existing = new Set(dates.length ? (await env.DB.prepare('SELECT dedupe_hash FROM transactions WHERE household_id = ? AND date BETWEEN ? AND ?')
+    .bind(hid, dates[0], dates[dates.length - 1]).all()).results.map((x) => x.dedupe_hash) : []);
   const used = new Set();
   const seen = {};
   const stmts = [];
@@ -27,9 +32,10 @@ export async function onRequestPost({ request, env, data }) {
     seen[base] = (seen[base] || 0) + 1;
     const hash = `${base}#${seen[base]}`;
 
-    // Kvittering skannet tidligere? Samme beløp innenfor tre dager.
-    const d0 = Date.parse(date);
-    const rc = pending.find((p) => !used.has(p.id) && p.amount_ore === amount && Math.abs(Date.parse(p.date) - d0) <= 3 * 864e5);
+    if (existing.has(hash)) continue;
+
+    // Kvittering skannet tidligere? Samme beløp, nærmeste dato innenfor fem dager.
+    const rc = closestMatch(pending, date, amount, used);
     if (rc) {
       used.add(rc.id); merged++;
       stmts.push(env.DB.prepare('UPDATE OR IGNORE transactions SET dedupe_hash = ?, bank_text = ?, receipt_pending = 0 WHERE id = ?').bind(hash, text, rc.id));
