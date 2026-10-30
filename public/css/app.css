@@ -209,3 +209,11 @@ td.amt.pos{color:var(--accent-text)}
 .chip:hover{background:var(--accent-soft);border-color:var(--accent-soft)}
 .sect{margin:10px 0 0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .item .qty{display:inline-block;margin-right:8px;padding:1px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent-text);font-size:13px;font-weight:700}
+.listhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:12px}
+.item .note{display:block;font-size:13px;font-style:italic;color:var(--muted);font-weight:400}
+.item .who a{color:var(--accent-text)}
+.itemedit{list-style:none;padding:12px 0 16px;border-bottom:1px solid var(--line2)}
+.shopmode .item{min-height:72px}
+.shopmode .item label{min-height:72px;gap:18px}
+.shopmode .item input[type=checkbox]{width:34px;height:34px}
+.shopmode .item .txt{font-size:20px}

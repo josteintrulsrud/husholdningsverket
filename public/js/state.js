@@ -20,6 +20,11 @@ export const S = {
   busy: {},
   admin: null,
   groups: null,         // ukategoriserte transaksjoner gruppert per butikk
+  shopSug: [],          // hurtigforslag til handlelistene
+  sections: [],         // avdelinger i matbutikken, fra serveren
+  shopEdit: null,       // varen som redigeres
+  shopMode: false,      // handlemodus: store avkrysningsbokser og våken skjerm
+  wakeLock: false,
 };
 
 export const cat = (id) => S.settings?.categories.find((c) => c.id === id);

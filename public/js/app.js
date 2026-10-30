@@ -158,13 +158,40 @@ async function reloadTx() {
   await ensureMonths(months);
 }
 
+// Handlelistene hentes hvert 4. sekund mens en liste er åpen (så dere ser hverandres avkrysninger nesten med en gang),
+// ellers hvert 20. sekund. Mens en vare redigeres, tegnes ikke siden på nytt, så det du skriver ikke forsvinner.
+let shopGen = 0;
 function startShopPolling() {
-  clearInterval(shopTimer);
-  shopTimer = setInterval(async () => {
-    if (document.hidden || !S.hid) return;
-    try { await loadShop(); if (['mat', 'hjem', 'oversikt'].includes(S.view)) renderKeepFocus(); else renderNav(); } catch { /* prøver igjen */ }
-  }, 20000);
+  clearTimeout(shopTimer);
+  const gen = ++shopGen; // en ny start stopper den gamle løkken, også midt i en henting
+  const tick = async () => {
+    if (gen !== shopGen) return;
+    const onList = S.view === 'mat' || S.view === 'hjem';
+    if (!document.hidden && S.hid) {
+      try {
+        await loadShop();
+        if (S.shopEdit) renderNav();
+        else if (onList || S.view === 'oversikt') renderKeepFocus(); else renderNav();
+      } catch { /* prøver igjen */ }
+    }
+    if (gen === shopGen) shopTimer = setTimeout(tick, onList ? 4000 : 20000);
+  };
+  shopTimer = setTimeout(tick, 4000);
 }
+
+// Handlemodus holder skjermen på (Screen Wake Lock), der telefonen støtter det
+let wakeSentinel = null;
+async function setWakeLock(on) {
+  try {
+    if (on && !wakeSentinel && navigator.wakeLock && document.visibilityState === 'visible') {
+      wakeSentinel = await navigator.wakeLock.request('screen');
+      wakeSentinel.addEventListener('release', () => { wakeSentinel = null; S.wakeLock = false; });
+      S.wakeLock = true;
+    } else if (!on && wakeSentinel) { await wakeSentinel.release(); wakeSentinel = null; S.wakeLock = false; }
+  } catch { S.wakeLock = false; }
+}
+document.addEventListener('visibilitychange', () => { if (S.shopMode && document.visibilityState === 'visible') setWakeLock(true).then(render); });
+function leaveShopMode() { if (S.shopMode) { S.shopMode = false; setWakeLock(false); } }
 
 async function loadAdmin() {
   S.admin = S.admin || null; render();
@@ -216,6 +243,7 @@ function startImport(text) {
 
 const actions = {
   async go(b) {
+    if (b.dataset.view !== S.view) { leaveShopMode(); S.shopEdit = null; }
     S.view = b.dataset.view;
     if (b.dataset.filter) S.filter.cat = b.dataset.filter;
     render(); window.scrollTo({ top: 0 });
@@ -310,6 +338,12 @@ const actions = {
   cancelReceipt() { S.receipt = null; S.view = 'oversikt'; render(); },
 
   addSug(b) { return addToList(b.dataset.list, b.dataset.text); },
+  editItem(b) { S.shopEdit = b.dataset.id || null; render(); },
+  async shopMode() {
+    if (S.shopMode) leaveShopMode();
+    else { S.shopMode = true; S.shopEdit = null; await setWakeLock(true); }
+    render(); window.scrollTo({ top: 0 });
+  },
   async delItem(b) { await hapi(`/shopping?id=${encodeURIComponent(b.dataset.id)}`, { method: 'DELETE' }); S.shop = S.shop.filter((x) => x.id !== b.dataset.id); render(); },
   async clearDone(b) { await hapi(`/shopping?list=${b.dataset.list}&done=1`, { method: 'DELETE' }); await loadShop(); render(); },
 
@@ -358,8 +392,11 @@ const changes = {
   },
   async toggleItem(el) {
     const x = S.shop.find((i) => i.id === el.dataset.id); if (!x) return;
+    // Vises med en gang; serveren oppdateres i bakgrunnen
+    x.done = el.checked; x.doneBy = el.checked ? S.me.id : null; x.doneAt = el.checked ? new Date().toISOString() : null;
+    renderKeepFocus();
     await hapi('/shopping', { method: 'PATCH', body: { id: x.id, done: el.checked } });
-    await loadShop(); render();
+    await loadShop(); renderKeepFocus();
   },
   groupCat(el) { if (el.value) return categorizeGroups([{ key: el.dataset.key, categoryId: el.value }], 'manuell'); },
   async switchHousehold(el) { S.hid = el.value; S.view = 'oversikt'; await loadHousehold(); },
@@ -395,6 +432,13 @@ const submits = {
     const r = await hapi('/rules', { method: 'POST', body: { matchText: fd.get('match'), categoryId: fd.get('cat') } });
     await Promise.all([loadSettings(), reloadTx()]); render();
     toast(`Regel lagret${r.applied ? `, ${r.applied} transaksjoner fikk kategori` : ''}.`);
+  },
+  async saveItem(form) {
+    const fd = new FormData(form);
+    const price = fd.get('price') == null || String(fd.get('price')).trim() === '' ? null : parseNum(fd.get('price'));
+    const edit = { qty: fd.get('qty'), note: fd.get('note'), place: fd.get('place'), priceOre: price == null || isNaN(price) ? null : price, assignedTo: fd.get('who') || null };
+    await hapi('/shopping', { method: 'PATCH', body: { id: form.dataset.id, edit } });
+    S.shopEdit = null; await loadShop(); render();
   },
   async addItem(form) {
     const text = String(new FormData(form).get('text') || '').trim(); if (!text) return;

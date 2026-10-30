@@ -42,7 +42,8 @@ export function mapSettings(d) {
 }
 export function mapItem(r) {
   return {
-    id: r.id, list: r.list, text: r.text, qty: r.qty, section: r.section, done: !!r.done,
+    id: r.id, list: r.list, text: r.text, qty: r.qty, note: r.note, section: r.section, done: !!r.done,
+    lastPrice: r.last_price_ore, lastStore: r.last_price_store, place: r.place, price: r.price_ore, assignedTo: r.assigned_to,
     by: r.added_by, at: r.added_at, doneBy: r.done_by, doneAt: r.done_at,
   };
 }
