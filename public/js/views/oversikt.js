@@ -65,7 +65,7 @@ export function vOversikt() {
       <section class="panel" aria-labelledby="h-p">
         <div class="panel-head"><h2 id="h-p">Trenger kategori</h2>${pend.length ? `<span class="pill warn">${pend.length} igjen</span>` : '<span class="pill ok">Ferdig</span>'}</div>
         ${pend.length ? pendingList(pend.slice(0, 5)) : `<p class="muted" style="font-size:14px">Alt i ${monthName(S.month)} er kategorisert.</p>`}
-        ${S.groups?.total ? `<button class="btn small" data-action="go" data-view="kategoriser">Kategoriser alle ${S.groups.total} på én gang</button>` : ''}
+        ${S.groups?.total ? `<button class="btn small" data-action="go" data-view="kategoriser">Kategoriser dine ${S.groups.total} på én gang</button>` : ''}
       </section>
       <section class="panel" aria-labelledby="h-g">
         <div class="panel-head"><h2 id="h-g">Sparemål</h2><button class="btn small" data-action="go" data-view="budsjett">Administrer</button></div>

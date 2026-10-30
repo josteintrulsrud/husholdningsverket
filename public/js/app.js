@@ -49,6 +49,8 @@ function renderNav() {
     const warn = id === 'transaksjoner' || id === 'kategoriser';
     return `<button data-action="go" data-view="${id}" ${S.view === id ? 'aria-current="page"' : ''}><span>${label}</span>${n ? `<span class="count ${warn ? '' : 'neutral'}">${n}</span>` : ''}</button>`;
   }).join('');
+  // Antall på handleliste-knappene i toppfeltet (mobil)
+  document.querySelectorAll('[data-count]').forEach((el) => { const n = open(el.dataset.count); el.textContent = n; el.hidden = !n; });
 }
 
 function render() {
@@ -58,7 +60,7 @@ function render() {
   showApp(true);
   $('monthLabel').textContent = ymLabel(S.month);
   document.querySelector('.month').hidden = !S.hid;
-  document.querySelectorAll('.toolbar > label[for=receiptInput], .toolbar > [data-view=import]').forEach((el) => { el.hidden = !S.hid; });
+  document.querySelectorAll('.toolbar > label[for=receiptInput], .toolbar > [data-view]').forEach((el) => { el.hidden = !S.hid; });
   $('hhSlot').innerHTML = S.households.length > 1
     ? `<label class="sr" for="hhSel">Husholdning</label><select class="hhselect" id="hhSel" data-change="switchHousehold">${S.households.map((h) => `<option value="${h.id}" ${h.id === S.hid ? 'selected' : ''}>${esc(h.name)}</option>`).join('')}</select>`
     : '';
@@ -346,7 +348,6 @@ const changes = {
     await loadShop(); render();
   },
   groupCat(el) { if (el.value) return categorizeGroups([{ key: el.dataset.key, categoryId: el.value }], 'manuell'); },
-  wrapWho(el) { S.wrapWho = el.value; render(); },
   async switchHousehold(el) { S.hid = el.value; S.view = 'oversikt'; await loadHousehold(); },
 };
 

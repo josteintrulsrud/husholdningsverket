@@ -55,19 +55,16 @@ function trend(now, before, prevYm) {
   return `<span class="trend ${pct > 0 ? 'up' : 'down'}">${pct > 0 ? '+' : '−'}${Math.abs(pct)} % fra ${monthName(prevYm)}</span>`;
 }
 
-export const wrapKey = () => `${S.month}|${S.wrapWho || S.me.id}`;
+// «Måneden din» er personlig: alltid bare den innloggede sin måned.
+export const wrapKey = () => `${S.month}|${S.me.id}`;
 
 export function vWrap() {
-  const who = S.wrapWho === 'alle' ? null : (S.wrapWho || S.me.id);
+  const who = S.me.id;
   const W = wrapData(S.month, who);
   const mName = monthName(S.month), prevYm = ymShift(S.month, -1);
-  const person = who ? (S.settings.members.find((x) => x.id === who)?.name || '') : '';
+  const person = S.me.name || '';
   const anim = lastAnimated !== wrapKey(); lastAnimated = wrapKey();
-  const members = S.settings.members;
-  const picker = members.length > 1 ? `<label class="sr" for="wrapWho">Vis for</label><select class="hhselect" id="wrapWho" data-change="wrapWho">
-      ${members.map((mm) => `<option value="${mm.id}" ${mm.id === (who || '') ? 'selected' : ''}>${esc(mm.id === S.me.id ? 'Meg' : (mm.name || mm.email))}</option>`).join('')}
-      <option value="alle" ${!who ? 'selected' : ''}>Hele husholdningen</option></select>` : '';
-  const head = `<div class="wrap-hero"><div><p class="lead">Måneden din</p><h1>${ymLabel(S.month)}</h1></div><div style="display:flex;gap:10px;flex-wrap:wrap">${picker}<button class="btn dark" data-action="prevMonth">Se forrige måned</button></div></div>`;
+  const head = `<div class="wrap-hero"><div><p class="lead">Måneden din</p><h1>${ymLabel(S.month)}</h1></div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn dark" data-action="prevMonth">Se forrige måned</button></div></div>`;
 
   if (!W.count) return `${head}<div class="empty"><h2>Ingen utgifter registrert i ${mName}</h2><p class="lead">Importer kontoutskriften for måneden, så lager appen en oppsummering.</p><button class="btn primary" data-action="go" data-view="import">Importer CSV</button></div>`;
 
@@ -96,8 +93,7 @@ export function vWrap() {
 }
 
 export function wrapFacts() {
-  const who = S.wrapWho === 'alle' ? null : (S.wrapWho || S.me.id);
-  const W = wrapData(S.month, who);
+  const W = wrapData(S.month, S.me.id);
   return {
     maaned: ymLabel(S.month), brukt_kr: Math.round(W.spent / 100), forrige_maaned_kr: Math.round(W.prevSpent / 100),
     toppkategorier: W.cats.slice(0, 5).map(([k, v]) => ({ kategori: catName(k), kr: Math.round(v / 100) })),

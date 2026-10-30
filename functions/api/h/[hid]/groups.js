@@ -2,15 +2,17 @@ import { json, bad, readJson } from '../../../../lib/http.js';
 import { uuid } from '../../../../lib/crypto.js';
 import { ruleKey, isGenericKey, applyRules } from '../../../../lib/rules.js';
 
-async function uncategorized(env, hid) {
+// Kategoriser er personlig: hver ser og kategoriserer bare sine egne transaksjoner.
+// Reglene som lages er felles, så de treffer også de andres transaksjoner fra samme butikk.
+async function uncategorized(env, hid, userId) {
   return (await env.DB.prepare(
-    'SELECT id, date, amount_ore, description FROM transactions WHERE household_id = ? AND category_id IS NULL ORDER BY date'
-  ).bind(hid).all()).results;
+    'SELECT id, date, amount_ore, description FROM transactions WHERE household_id = ? AND user_id = ? AND category_id IS NULL ORDER BY date'
+  ).bind(hid, userId).all()).results;
 }
 
-// GET – alle transaksjoner uten kategori (hele historikken), gruppert per butikk
+// GET – egne transaksjoner uten kategori (hele historikken), gruppert per butikk
 export async function onRequestGet({ env, data }) {
-  const rows = await uncategorized(env, data.hid);
+  const rows = await uncategorized(env, data.hid, data.user.id);
   const groups = new Map();
   for (const t of rows) {
     const key = ruleKey(t.description);
@@ -40,7 +42,7 @@ export async function onRequestPost({ request, env, data }) {
 
   const stmts = [];
   let updated = 0, rulesMade = 0;
-  for (const t of await uncategorized(env, data.hid)) {
+  for (const t of await uncategorized(env, data.hid, data.user.id)) {
     const cat = choice.get(ruleKey(t.description));
     if (!cat) continue;
     updated++;

@@ -5,7 +5,7 @@ import { closestMatch, imageKey, MATCH_DAYS } from '../../../../lib/receipts.js'
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
 const shift = (date, days) => new Date(Date.parse(date) + days * 864e5).toISOString().slice(0, 10);
 
-// GET – alle kvitteringer i husholdningen. GET ?img=<id> – bildet til én kvittering.
+// GET – mine kvitteringer (de jeg har skannet). GET ?img=<id> – bildet til én kvittering.
 export async function onRequestGet({ request, env, data }) {
   const img = new URL(request.url).searchParams.get('img');
   if (img) {
@@ -18,8 +18,8 @@ export async function onRequestGet({ request, env, data }) {
   }
   const rows = (await env.DB.prepare(
     `SELECT id, user_id, date, amount_ore, description, bank_text, category_id, receipt_json, receipt_pending, receipt_image
-     FROM transactions WHERE household_id = ? AND receipt_json IS NOT NULL ORDER BY date DESC, created_at DESC`
-  ).bind(data.hid).all()).results;
+     FROM transactions WHERE household_id = ? AND receipt_user_id = ? AND receipt_json IS NOT NULL ORDER BY date DESC, created_at DESC`
+  ).bind(data.hid, data.user.id).all()).results;
   return json({ receipts: rows });
 }
 
@@ -58,14 +58,14 @@ export async function onRequestPost({ request, env, data }) {
   let id;
   if (bank) {
     id = bank.id;
-    await env.DB.prepare('UPDATE transactions SET receipt_json = ? WHERE id = ?').bind(receipt, id).run();
+    await env.DB.prepare('UPDATE transactions SET receipt_json = ?, receipt_user_id = ? WHERE id = ?').bind(receipt, data.user.id, id).run();
     if (catId) await env.DB.prepare("UPDATE transactions SET category_id = ?, categorized_by = 'manuell' WHERE id = ?").bind(catId, id).run();
   } else {
     id = uuid();
     await env.DB.prepare(
-      `INSERT INTO transactions (id, household_id, user_id, date, amount_ore, description, category_id, categorized_by, receipt_json, receipt_pending, dedupe_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
-    ).bind(id, data.hid, data.user.id, b.date, amount, store, catId, catId ? 'manuell' : null, receipt, 'kvittering|' + id).run();
+      `INSERT INTO transactions (id, household_id, user_id, date, amount_ore, description, category_id, categorized_by, receipt_json, receipt_pending, receipt_user_id, dedupe_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
+    ).bind(id, data.hid, data.user.id, b.date, amount, store, catId, catId ? 'manuell' : null, receipt, data.user.id, 'kvittering|' + id).run();
   }
 
   let imageSaved = false;
@@ -84,10 +84,11 @@ export async function onRequestPost({ request, env, data }) {
 // er den koblet til et kortkjøp, beholdes kortkjøpet.
 export async function onRequestDelete({ request, env, data }) {
   const id = new URL(request.url).searchParams.get('id');
-  const t = await env.DB.prepare('SELECT id, receipt_pending, receipt_image FROM transactions WHERE id = ? AND household_id = ?').bind(id, data.hid).first();
+  const t = await env.DB.prepare('SELECT id, receipt_pending, receipt_image FROM transactions WHERE id = ? AND household_id = ? AND receipt_user_id = ?')
+    .bind(id, data.hid, data.user.id).first();
   if (!t) return bad('Fant ikke kvitteringen', 404);
   if (t.receipt_image && env.RECEIPTS) await env.RECEIPTS.delete(t.receipt_image);
   if (t.receipt_pending) await env.DB.prepare('DELETE FROM transactions WHERE id = ?').bind(t.id).run();
-  else await env.DB.prepare('UPDATE transactions SET receipt_json = NULL, receipt_image = NULL WHERE id = ?').bind(t.id).run();
+  else await env.DB.prepare('UPDATE transactions SET receipt_json = NULL, receipt_image = NULL, receipt_user_id = NULL WHERE id = ?').bind(t.id).run();
   return json({ ok: true });
 }

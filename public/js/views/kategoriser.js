@@ -9,13 +9,13 @@ export function vKategoriser() {
   if (!G) return `${heading('Kategoriser')}<p class="loading">Laster…</p>`;
   if (!G.groups.length) {
     return `${heading('Kategoriser')}
-    <div class="empty"><h2>Alt er kategorisert</h2><p class="lead">Ingen transaksjoner mangler kategori. Nye importer kategoriseres automatisk med reglene dine.</p>
+    <div class="empty"><h2>Alt er kategorisert</h2><p class="lead">Ingen av dine transaksjoner mangler kategori. Nye importer kategoriseres automatisk med reglene dine.</p>
     <button class="btn primary" data-action="go" data-view="oversikt">Til oversikten</button></div>`;
   }
   const sugCount = G.groups.filter((g) => G.sug[g.key]).length;
   const shown = G.groups.slice(0, G.shown);
   return `
-  ${heading('Kategoriser', `${G.total} transaksjoner uten kategori, fordelt på ${G.groups.length} butikker og mottakere. Velg kategori én gang per butikk, så får alle transaksjonene den, og det lages en regel for senere importer.`)}
+  ${heading('Kategoriser', `${G.total} av dine transaksjoner mangler kategori, fordelt på ${G.groups.length} butikker og mottakere. Velg kategori én gang per butikk, så får alle transaksjonene den, og det lages en regel for senere importer.`)}
   <section class="panel">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <button class="btn primary" data-action="aiGroups" ${S.busy.groups ? 'disabled' : ''}>${S.busy.groups ? `Claude foreslår…${S.busy.groups === true ? '' : ` (${S.busy.groups})`}` : 'Foreslå kategorier med Claude'}</button>

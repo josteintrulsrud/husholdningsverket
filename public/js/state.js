@@ -17,7 +17,6 @@ export const S = {
   receipt: null,        // kvittering under kontroll
   receipts: null,       // arkivet under «Mine kvitteringer»
   wrapText: {},         // AI-tekst per måned+person
-  wrapWho: null,        // hvem «Måneden din» viser (bruker-id eller 'alle')
   busy: {},
   admin: null,
   groups: null,         // ukategoriserte transaksjoner gruppert per butikk

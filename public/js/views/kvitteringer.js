@@ -1,4 +1,4 @@
-import { S, catName, memberName } from '../state.js';
+import { S, catName } from '../state.js';
 import { esc, kr, dateLabel, ymLabel } from '../util.js';
 import { heading } from './parts.js';
 
@@ -15,7 +15,7 @@ function card(r) {
       : '<div class="rthumb none">Uten bilde</div>'}
     <div class="rbody">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h2 style="overflow-wrap:anywhere">${esc(store)}</h2><strong style="white-space:nowrap">${kr(-r.amount, true)}</strong></div>
-      <p class="muted" style="font-size:13px;margin:0">${dateLabel(r.date)} · ${esc(catName(r.cat))}${(S.settings.members || []).length > 1 ? ` · lagt inn av ${esc(memberName(r.userId))}` : ''}</p>
+      <p class="muted" style="font-size:13px;margin:0">${dateLabel(r.date)} · ${esc(catName(r.cat))}</p>
       <p style="font-size:13px;margin:0">${r.pending
         ? '<span class="pill warn">Venter på kontoutskriften</span>'
         : `<span class="pill ok">Koblet til banken</span>${bank ? ` <span class="muted">${esc(bank)}</span>` : ''}`}</p>
