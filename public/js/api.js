@@ -42,7 +42,7 @@ export function mapSettings(d) {
 }
 export function mapItem(r) {
   return {
-    id: r.id, list: r.list, text: r.text, done: !!r.done,
+    id: r.id, list: r.list, text: r.text, qty: r.qty, section: r.section, done: !!r.done,
     by: r.added_by, at: r.added_at, doneBy: r.done_by, doneAt: r.done_at,
   };
 }

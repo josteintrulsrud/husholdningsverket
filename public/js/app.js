@@ -126,7 +126,20 @@ async function categorizeGroups(groups, by) {
   render();
   toast(`${r.updated} transaksjoner kategorisert${r.rules ? `, ${r.rules === 1 ? '1 regel' : r.rules + ' regler'} lagret` : ''}.`);
 }
-async function loadShop() { S.shop = (await hapi('/shopping')).items.map(mapItem); }
+async function loadShop() {
+  const d = await hapi('/shopping');
+  S.shop = d.items.map(mapItem); S.shopSug = d.suggestions || []; S.sections = d.sections || [];
+}
+// Én eller flere varer («melk, 2 brød»). Ukjente matvarer får avdeling av Claude i bakgrunnen, så listen hentes igjen litt etter.
+async function addToList(list, text) {
+  const r = await hapi('/shopping', { method: 'POST', body: { list, text } });
+  if (r.existing?.length) toast(`${r.existing.map((t) => `«${t}»`).join(', ')} står allerede på listen.`);
+  else if (r.added > 1) toast(`${r.added} varer lagt til.`);
+  await loadShop(); renderKeepFocus();
+  if (list === 'mat' && S.shop.some((x) => x.list === 'mat' && !x.done && !x.section)) {
+    setTimeout(() => loadShop().then(() => { if (S.view === 'mat') renderKeepFocus(); }).catch(() => {}), 5000);
+  }
+}
 
 async function ensureMonths(yms) {
   const missing = yms.filter((m) => !loadedMonths.has(m)).sort();
@@ -296,6 +309,7 @@ const actions = {
   moreGroups() { S.groups.shown += 40; render(); },
   cancelReceipt() { S.receipt = null; S.view = 'oversikt'; render(); },
 
+  addSug(b) { return addToList(b.dataset.list, b.dataset.text); },
   async delItem(b) { await hapi(`/shopping?id=${encodeURIComponent(b.dataset.id)}`, { method: 'DELETE' }); S.shop = S.shop.filter((x) => x.id !== b.dataset.id); render(); },
   async clearDone(b) { await hapi(`/shopping?list=${b.dataset.list}&done=1`, { method: 'DELETE' }); await loadShop(); render(); },
 
@@ -384,9 +398,7 @@ const submits = {
   },
   async addItem(form) {
     const text = String(new FormData(form).get('text') || '').trim(); if (!text) return;
-    const r = await hapi('/shopping', { method: 'POST', body: { list: form.dataset.list, text } });
-    if (r.exists) toast(`«${text}» står allerede på listen.`);
-    await loadShop(); render();
+    await addToList(form.dataset.list, text);
     const n = $('shopAdd'); if (n) { n.value = ''; n.focus(); }
   },
   async saveReceipt(form) {
